@@ -1,7 +1,7 @@
 import requests
 
 API_ROOT="https://api.openweathermap.org/data/2.5/weather?q="
-API_USER="&appid=708e504faa095594df27be91c839e83d&units=metric"
+API_USER="&appid=YOUROPENWHEATERMAPAPI&units=metric"
 
 API_CITY=input("Where in the world are you?:\n")
 def get_city():
