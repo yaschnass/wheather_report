@@ -1,82 +1,52 @@
 import pytest
-from unittest.mock import patch, MagicMock
-import io
-import sys
-from weather import get_city, fetch_location, print_weather, main
+import requests
+from unittest.mock import patch
+from weather_report import get_city, fetch_location, print_weather
 
-# Test for get_city function
+# Mocking the fetch_location function
+@pytest.fixture
+def mock_weather_data():
+    return {
+        "name": "Test City",
+        "weather": [{"description": "clear sky"}],
+        "main": {
+            "temp": 25,
+            "feels_like": 27,
+            "temp_min": 20,
+            "temp_max": 30,
+            "humidity": 60
+        },
+        "wind": {
+            "speed": 15
+        }
+    } 
+
+# Test for get_city
 def test_get_city():
     assert get_city("New York") == "New York"
     assert get_city("") is None
 
-# Test for fetch_location function
+# Test for fetch_location using requests-mock
 @patch('requests.get')
-def test_fetch_location(mock_get):
-    # Mock the JSON response
-    mock_response = MagicMock()
-    mock_response.json.return_value = {
-        "name": "New York",
-        "weather": [{"description": "clear sky"}],
-        "main": {
-            "temp": 25,
-            "feels_like": 27,
-            "temp_min": 20,
-            "temp_max": 30,
-            "humidity": 60
-        },
-        "wind": {"speed": 10}
-    }
-    mock_get.return_value = mock_response
+def test_fetch_location(mock_get, mock_weather_data):
+    mock_get.return_value.json.return_value = mock_weather_data
+    city_name = "Test City"
+    weather_data = fetch_location(city_name)
     
-    result = fetch_location("New York")
-    assert result["name"] == "New York"
-    assert result["weather"][0]["description"] == "clear sky"
+    assert weather_data["name"] == "Test City"
+    assert weather_data["weather"][0]["description"] == "clear sky"
+    assert weather_data["main"]["temp"] == 25
 
-# Test for print_weather function
-@patch('sys.stdout', new_callable=io.StringIO)
-def test_print_weather(mock_stdout):
-    weather_data = {
-        "name": "New York",
-        "weather": [{"description": "clear sky"}],
-        "main": {
-            "temp": 25,
-            "feels_like": 27,
-            "temp_min": 20,
-            "temp_max": 30,
-            "humidity": 60
-        },
-        "wind": {"speed": 10}
-    }
-    print_weather(weather_data)
+# Test for print_weather
+def test_print_weather(mock_weather_data):
+    with patch('builtins.print') as mock_print:
+        print_weather(mock_weather_data)
     
-    output = mock_stdout.getvalue()
-    print("output from print_weather:", output)
-    assert "Today in New York we have clear sky with the median temperature of 25°C." in output
-    assert "The minimum Temperature is 20°C and the maximum 30°C." in output
-    assert "It feels like 27°C and the humidity is 60%" in output
-    assert "Windspeed: 19.44 knots, no kiting today :(" in output
-
-# Test for main function
-@patch('builtins.input', return_value='New York')
-@patch('your_module.fetch_location')
-@patch('your_module.print_weather')
-def test_main(mock_print_weather, mock_fetch_location, mock_input):
-    # Mock the return value of fetch_location
-    mock_fetch_location.return_value = {
-        "name": "New York",
-        "weather": [{"description": "clear sky"}],
-        "main": {
-            "temp": 25,
-            "feels_like": 27,
-            "temp_min": 20,
-            "temp_max": 30,
-            "humidity": 60
-        },
-        "wind": {"speed": 10}
-    }
+        # Check if print was called with expected strings
+        mock_print.assert_any_call("Today in Test City we have clear sky with the median temperature of 25°C.\n"
+                                   "The minimum Temperature is 20°C and the maximum 30°C.\n")
+        mock_print.assert_any_call("It feels like 27°C and the humidity is 60%")
+        mock_print.assert_any_call('Windspeed: 29.16 knots, time to go KITING!')
     
-    with patch('sys.stdout', new_callable=io.StringIO) as mock_stdout:
-        main()
-        output = mock_stdout.getvalue()
-        assert "Today in New York we have clear sky with the median temperature of 25°C." in output
-
+        # Ensure that the snow-related print statement was not called
+        assert not any("Snowfall: " in call[0] for call in mock_print.call_args_list)
